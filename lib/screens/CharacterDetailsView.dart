@@ -3,6 +3,7 @@ import 'package:thenetherscrolls/data/character.dart';
 import 'package:thenetherscrolls/data/DnDData.dart';
 import 'package:thenetherscrolls/data/DnDMath.dart';
 import 'package:thenetherscrolls/widgets/entries_tab.dart';
+import 'package:thenetherscrolls/widgets/notes_tab.dart';
 import 'package:thenetherscrolls/screens/spells_tab.dart';
 
 class CharacterDetails extends StatefulWidget {
@@ -13,34 +14,18 @@ class CharacterDetails extends StatefulWidget {
   @override
   State<CharacterDetails> createState() => _CharacterDetailsState();
 }
-class CharacterEntry {
-  String name;
-  String description;
-  int quantity; // per le passive resta 1 e non lo mostriamo
 
-  CharacterEntry({
-    required this.name,
-    this.description = '',
-    this.quantity = 1,
-  });
-}
-
-// Un incantesimo salvato: solo il minimo, il testo lo scarichi dopo
-class SpellRef {
-  final String index; // es. "fireball" (serve per la fetch)
-  final String name; // es. "Fireball"
-  final int level; // 0 = trucchetto
-
-  const SpellRef({
-    required this.index,
-    required this.name,
-    required this.level,
-  });
-}
 class _CharacterDetailsState extends State<CharacterDetails> {
   CharacterSheet get c => widget.character;
 
-  // Bonus competenza calcolato una volta sola
+  final _amountCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    super.dispose();
+  }
+
   int get prof => proficiencyBonus(c.characterLevel);
 
   void _changeHp(int delta) {
@@ -49,7 +34,15 @@ class _CharacterDetailsState extends State<CharacterDetails> {
     });
   }
 
-  // Aggiunge o toglie una voce da un Set (competenza sì/no)
+  // sign = -1 per il danno, +1 per la cura
+  void _applyAmount(int sign) {
+    final n = int.tryParse(_amountCtrl.text);
+    if (n == null || n <= 0) return;
+    _changeHp(sign * n);
+    _amountCtrl.clear();
+    FocusScope.of(context).unfocus();
+  }
+
   void _toggle(Set<String> set, String key, bool value) {
     setState(() {
       if (value) {
@@ -62,25 +55,62 @@ class _CharacterDetailsState extends State<CharacterDetails> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(c.characterName)),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildHeader(),
-          const SizedBox(height: 16),
-          _buildHpCard(),
-          const SizedBox(height: 16),
-          _buildCombatRow(),
-          const SizedBox(height: 16),
-          _buildAbilities(),
-          const SizedBox(height: 16),
-          _buildSavingThrows(),
-          const SizedBox(height: 16),
-          _buildSkills(),
-          const SizedBox(height: 16),
-        ],
+    return DefaultTabController(
+      length: 5,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(c.characterName),
+          bottom: const TabBar(
+            isScrollable: true,
+            tabs: [
+              Tab(text: 'Scheda'),
+              Tab(text: 'Oggetti'),
+              Tab(text: 'Incantesimi'),
+              Tab(text: 'Passive'),
+              Tab(text: 'Note'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            _buildSheetTab(),
+            EntriesTab(
+              entries: c.items,
+              showQuantity: true,
+              addLabel: 'Aggiungi oggetto',
+              emptyText: 'Nessun oggetto. Aggiungi spade, pozioni, monete...',
+            ),
+            SpellsTab(spells: c.spells),
+            EntriesTab(
+              entries: c.passives,
+              showQuantity: false,
+              addLabel: 'Aggiungi passiva',
+              emptyText: 'Nessuna passiva. Aggiungi tratti di razza e classe.',
+            ),
+            NotesTab(character: c),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildSheetTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildHeader(),
+        const SizedBox(height: 16),
+        _buildHpCard(),
+        const SizedBox(height: 16),
+        _buildCombatRow(),
+        const SizedBox(height: 16),
+        _buildAbilities(),
+        const SizedBox(height: 16),
+        _buildSavingThrows(),
+        const SizedBox(height: 16),
+        _buildSkills(),
+        const SizedBox(height: 16),
+      ],
     );
   }
 
@@ -122,6 +152,34 @@ class _CharacterDetailsState extends State<CharacterDetails> {
                 _HpButton(label: '+5', onPressed: () => _changeHp(5)),
               ],
             ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _amountCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Quantità',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () => _applyAmount(-1),
+                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('Danno'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () => _applyAmount(1),
+                  style: FilledButton.styleFrom(backgroundColor: Colors.green),
+                  child: const Text('Cura'),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -130,7 +188,6 @@ class _CharacterDetailsState extends State<CharacterDetails> {
 
   // --- BLOCCO 3: CA, iniziativa, velocità, competenza ---
   Widget _buildCombatRow() {
-    // Percezione passiva = 10 + bonus di Percezione
     final perceptionBonus = _skillBonus(
       const SkillInfo('Percezione', 'SAG'),
     );
@@ -224,7 +281,6 @@ class _CharacterDetailsState extends State<CharacterDetails> {
 
 // ============ WIDGET PICCOLI (riusabili) ============
 
-// Pulsante per i PF
 class _HpButton extends StatelessWidget {
   final String label;
   final VoidCallback onPressed;
@@ -240,7 +296,6 @@ class _HpButton extends StatelessWidget {
   }
 }
 
-// Riquadro piccolo (CA, iniziativa, ecc.)
 class _StatBox extends StatelessWidget {
   final String label;
   final String value;
@@ -267,7 +322,6 @@ class _StatBox extends StatelessWidget {
   }
 }
 
-// Riquadro caratteristica: modificatore grande, valore piccolo
 class _AbilityBox extends StatelessWidget {
   final String label;
   final int score;
@@ -292,7 +346,6 @@ class _AbilityBox extends StatelessWidget {
   }
 }
 
-// Scatola con titolo e una lista di righe dentro
 class _SectionCard extends StatelessWidget {
   final String title;
   final List<Widget> children;
@@ -317,7 +370,6 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
-// Riga: [casella competenza] [+bonus] [nome] (sigla)
 class _ProficiencyRow extends StatelessWidget {
   final String label;
   final String? sublabel;

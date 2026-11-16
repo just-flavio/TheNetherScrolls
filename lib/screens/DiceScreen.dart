@@ -11,7 +11,7 @@ class DiceScreen extends StatefulWidget {
 
 class _DiceScreenState extends State<DiceScreen> {
   final Random _random = Random();
-  final List<int> _diceSides = [4, 8, 10, 12, 20, 100];
+  final List<int> _diceSides = [4, 6, 8, 10, 12, 20, 100];
 
   int _selectedSides = 20;
   int _diceCount = 1;
