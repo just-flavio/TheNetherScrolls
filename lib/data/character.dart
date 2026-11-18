@@ -37,25 +37,41 @@ class CharacterSheet {
   final Widget characterIcon;
   final String characterName;
   final String race;
-  final List<CharacterClass> classes;
+  List<CharacterClass> classes;
+  void setScore(String ability, int value) {
+    switch (ability) {
+      case 'FOR':
+        strength = value;
+      case 'DES':
+        dexterity = value;
+      case 'COS':
+        constitution = value;
+      case 'INT':
+        intelligence = value;
+      case 'SAG':
+        wisdom = value;
+      case 'CAR':
+        charisma = value;
+    }
+  }
 
-  int strength;
-  int dexterity;
-  int constitution;
-  int intelligence;
-  int wisdom;
-  int charisma;
-  int maxHp;
-  int currentHp;
-  int armorClass;
-  int speed; // NUOVO: velocità in metri o piedi, come preferisci
+  int strength; //Statistiche generali
+  int dexterity; //Statistiche generali
+  int constitution; //Statistiche generali
+  int intelligence; //Statistiche generali
+  int wisdom; //Statistiche generali
+  int charisma; //Statistiche generali
+  int maxHp; //Statistiche generali
+  int currentHp; //hp adesso
+  int armorClass; //Classe armatura
+  int speed; //velocità
   String notes;
-  // NUOVO: in cosa il personaggio ha competenza
+  // in cosa il personaggio ha competenza
   final Set<String> savingThrowProficiencies; // es. {'FOR', 'CAR'}
   final Set<String> skillProficiencies; // es. {'Atletica', 'Persuasione'}
-  final List<CharacterEntry> items; // NUOVO
-  final List<CharacterEntry> passives; // NUOVO
-  final List<SpellRef> spells;
+  final List<CharacterEntry> items; //gli oggetti che ha un personaggio
+  final List<CharacterEntry> passives; // Passive di classe
+  final List<SpellRef> spells; //incantesimi conosciuti
 
   CharacterSheet({
     required this.characterIcon,
@@ -112,4 +128,56 @@ class CharacterSheet {
       classes.map((characterClass) => characterClass.name).join(', ');
 }
 
-final List<CharacterSheet> characters = [];
+final List<CharacterSheet> characters = [
+  CharacterSheet(
+    characterIcon: const Icon(Icons.shield, color: Colors.blue),
+    characterName: 'Arthas',
+    race: 'Umano',
+    classes: [CharacterClass(name: 'Paladino', level: 15)],
+    strength: 18,
+    dexterity: 10,
+    constitution: 16,
+    intelligence: 8,
+    wisdom: 12,
+    charisma: 16,
+    maxHp: 140,
+    armorClass: 20,
+    speed: 30,
+    notes: 'Il Barone ha un anello strano.',
+    savingThrowProficiencies: {'SAG', 'CAR'},
+    skillProficiencies: {'Atletica', 'Persuasione', 'Intimidire'},
+    items: [
+      CharacterEntry(name: 'Spada lunga +1', description: '1d8+1 taglienti'),
+      CharacterEntry(name: 'Pozione di cura', quantity: 3),
+    ],
+    passives: [
+      CharacterEntry(
+        name: 'Aura di protezione',
+        description: '+3 ai tiri salvezza degli alleati entro 3 m',
+      ),
+    ],
+    spells: [
+      const SpellRef(index: 'bless', name: 'Bless', level: 1),
+      const SpellRef(index: 'cure-wounds', name: 'Cure Wounds', level: 1),
+    ],
+  ),
+  CharacterSheet(
+    characterIcon: const Icon(Icons.bolt, color: Colors.orange),
+    characterName: 'Luna',
+    race: 'Elfo',
+    classes: [
+      CharacterClass(name: 'Ladro', level: 8),
+      CharacterClass(name: 'Ranger', level: 12),
+    ],
+    strength: 10,
+    dexterity: 9, // test: l'iniziativa deve mostrare -1
+    constitution: 12,
+    intelligence: 13,
+    wisdom: 14,
+    charisma: 10,
+    maxHp: 120,
+    currentHp: 80, // già ferita, per provare cura e danno
+    armorClass: 17,
+    skillProficiencies: {'Furtività', 'Percezione'},
+  ),
+];

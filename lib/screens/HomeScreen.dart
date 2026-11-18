@@ -29,13 +29,14 @@ class _HomescreenState extends State<Homescreen> {
           final character = characters[index];
           return CharacterTile(
             character: character,
-            onTap: () {
-              Navigator.push(
+            onTap: () async {
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => CharacterDetails(character: character),
                 ),
               );
+              setState(() {});
             },
           );
         },

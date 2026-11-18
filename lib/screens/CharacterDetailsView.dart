@@ -53,6 +53,78 @@ class _CharacterDetailsState extends State<CharacterDetails> {
     });
   }
 
+  Future<void> _edit() async {
+    final saved = await showEditCharacterDialog(context, c);
+    if (!saved) return;
+    setState(() {});
+    // DatabaseService.updateCharacter(c); // da attivare col database
+  }
+
+  Future<void> _editClasses() async {
+    final saved = await showClassesDialog(context, c);
+    if (!saved) return;
+    setState(() {});
+    // DatabaseService.updateCharacter(c);
+  }
+
+  Future<void> _confirmDelete() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Eliminare ${c.characterName}?'),
+        content: const Text('Non si può annullare.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annulla'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Elimina'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    // await DatabaseService.deleteCharacter(c); // da attivare col database
+    characters.remove(c);
+    if (!mounted) return;
+    Navigator.pop(context);
+  }
+
+  Future<void> _editAbility(String key) async {
+    final ctrl = TextEditingController(text: '${c.scoreOf(key)}');
+
+    final newValue = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(abilityNames[key]!),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Valore (1-30)'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annulla'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, int.tryParse(ctrl.text)),
+            child: const Text('Salva'),
+          ),
+        ],
+      ),
+    );
+    if (newValue == null) return;
+
+    setState(() => c.setScore(key, newValue.clamp(1, 30)));
+    // DatabaseService.updateCharacter(c);
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -60,6 +132,23 @@ class _CharacterDetailsState extends State<CharacterDetails> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(c.characterName),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.trending_up),
+              tooltip: 'Classi e livelli',
+              onPressed: _editClasses,
+            ),
+            IconButton(
+              icon: const Icon(Icons.edit),
+              tooltip: 'Modifica statistiche',
+              onPressed: _edit,
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Elimina',
+              onPressed: _confirmDelete,
+            ),
+          ],
           bottom: const TabBar(
             isScrollable: true,
             tabs: [
@@ -120,10 +209,7 @@ class _CharacterDetailsState extends State<CharacterDetails> {
       children: [
         c.characterIcon,
         const SizedBox(height: 8),
-        Text(
-          c.characterName,
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
+        Text(c.characterName, style: Theme.of(context).textTheme.headlineSmall),
         Text('${c.race} • ${c.characterClass} • Lv ${c.characterLevel}'),
       ],
     );
@@ -188,22 +274,24 @@ class _CharacterDetailsState extends State<CharacterDetails> {
 
   // --- BLOCCO 3: CA, iniziativa, velocità, competenza ---
   Widget _buildCombatRow() {
-    final perceptionBonus = _skillBonus(
-      const SkillInfo('Percezione', 'SAG'),
-    );
+    final perceptionBonus = _skillBonus(const SkillInfo('Percezione', 'SAG'));
 
     return Column(
       children: [
         Row(
           children: [
-            Expanded(child: _StatBox(label: 'CA', value: '${c.armorClass}')),
+            Expanded(
+              child: _StatBox(label: 'CA', value: '${c.armorClass}'),
+            ),
             Expanded(
               child: _StatBox(
                 label: 'Iniziativa',
                 value: signed(modifier(c.dexterity)),
               ),
             ),
-            Expanded(child: _StatBox(label: 'Velocità', value: '${c.speed}')),
+            Expanded(
+              child: _StatBox(label: 'Velocità', value: '${c.speed}'),
+            ),
           ],
         ),
         Row(
@@ -231,8 +319,12 @@ class _CharacterDetailsState extends State<CharacterDetails> {
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: 8,
       crossAxisSpacing: 8,
-      children: abilityNames.keys
-          .map((key) => _AbilityBox(label: key, score: c.scoreOf(key)))
+     children: abilityNames.keys
+          .map((key) => _AbilityBox(
+                label: key,
+                score: c.scoreOf(key),
+                onTap: () => _editAbility(key),
+              ))
           .toList(),
     );
   }
@@ -325,22 +417,27 @@ class _StatBox extends StatelessWidget {
 class _AbilityBox extends StatelessWidget {
   final String label;
   final int score;
+  final VoidCallback onTap;
 
-  const _AbilityBox({required this.label, required this.score});
 
-  @override
+  const _AbilityBox({required this.label, required this.score, required this.onTap});
+
+ @override
   Widget build(BuildContext context) {
     return Card(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.labelLarge),
-          Text(
-            signed(modifier(score)),
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          Text('($score)'),
-        ],
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(label, style: Theme.of(context).textTheme.labelLarge),
+            Text(
+              signed(modifier(score)),
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            Text('($score)'),
+          ],
+        ),
       ),
     );
   }
@@ -406,4 +503,175 @@ class _ProficiencyRow extends StatelessWidget {
       ),
     );
   }
+}
+
+// ============ Modifica PG ============
+
+Future<bool> showEditCharacterDialog(
+  BuildContext context,
+  CharacterSheet originalSheets,
+) async {
+  final hpCtrl = TextEditingController(text: '${originalSheets.maxHp}');
+  final acCtrl = TextEditingController(text: '${originalSheets.armorClass}');
+  final speedCtrl = TextEditingController(text: '${originalSheets.speed}');
+
+  final saved = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Modifica statistiche'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: hpCtrl,
+              decoration: const InputDecoration(labelText: 'PF max'),
+              keyboardType: TextInputType.number,
+            ),
+            TextField(
+              controller: acCtrl,
+              decoration: const InputDecoration(labelText: 'CA'),
+              keyboardType: TextInputType.number,
+            ),
+            TextField(
+              controller: speedCtrl,
+              decoration: const InputDecoration(labelText: 'Velocità'),
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Annulla'),
+        ),
+        FilledButton(
+          onPressed: () {
+            originalSheets.maxHp =
+                (int.tryParse(hpCtrl.text) ?? originalSheets.maxHp).clamp(
+                  1,
+                  999,
+                );
+            originalSheets.armorClass =
+                int.tryParse(acCtrl.text) ?? originalSheets.armorClass;
+            originalSheets.speed =
+                int.tryParse(speedCtrl.text) ?? originalSheets.speed;
+            originalSheets.currentHp = originalSheets.currentHp.clamp(
+              0,
+              originalSheets.maxHp,
+            );
+            Navigator.pop(ctx, true);
+          },
+          child: const Text('Salva'),
+        ),
+      ],
+    ),
+  );
+
+  return saved ?? false;
+}
+
+Future<bool> showClassesDialog(BuildContext context, CharacterSheet c) async {
+  // Copia di lavoro: tocco questa, e la applico solo se premi Salva
+  final working = c.classes
+      .map((e) => CharacterClass(name: e.name, level: e.level))
+      .toList();
+  final newNameCtrl = TextEditingController();
+
+  final saved = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      // StatefulBuilder = permette setState dentro la finestra
+      builder: (ctx, setLocal) {
+        final total = working.fold<int>(0, (s, e) => s + e.level);
+
+        void changeLevel(int i, int delta) {
+          final newLevel = working[i].level + delta;
+          setLocal(() {
+            if (newLevel <= 0) {
+              working.removeAt(i); // livello 0 = la classe sparisce
+            } else {
+              working[i] = CharacterClass(
+                name: working[i].name,
+                level: newLevel,
+              );
+            }
+          });
+        }
+
+        void addClass() {
+          final name = newNameCtrl.text.trim();
+          if (name.isEmpty || total >= 20) return;
+          setLocal(() {
+            working.add(CharacterClass(name: name, level: 1));
+            newNameCtrl.clear();
+          });
+        }
+
+        return AlertDialog(
+          title: Text('Classi (livello totale $total / 20)'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (int i = 0; i < working.length; i++)
+                  Row(
+                    children: [
+                      Expanded(child: Text(working[i].name)),
+                      IconButton(
+                        icon: const Icon(Icons.remove_circle_outline),
+                        onPressed: () => changeLevel(i, -1),
+                      ),
+                      Text('${working[i].level}'),
+                      IconButton(
+                        icon: const Icon(Icons.add_circle_outline),
+                        // non si supera il livello 20 totale
+                        onPressed: total >= 20 ? null : () => changeLevel(i, 1),
+                      ),
+                    ],
+                  ),
+                const Divider(),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: newNameCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Nuova classe',
+                        ),
+                        textCapitalization: TextCapitalization.words,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add),
+                      onPressed: total >= 20 ? null : addClass,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annulla'),
+            ),
+            FilledButton(
+              // serve almeno una classe
+              onPressed: working.isEmpty
+                  ? null
+                  : () {
+                      c.classes = working;
+                      Navigator.pop(ctx, true);
+                    },
+              child: const Text('Salva'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+
+  return saved ?? false;
 }
