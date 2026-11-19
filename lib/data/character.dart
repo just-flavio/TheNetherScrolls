@@ -1,26 +1,58 @@
 import 'package:flutter/material.dart';
 
+class IconOption {
+  final IconData icon;
+  final Color color;
+  const IconOption(this.icon, this.color);
+}
+
+const List<IconOption> characterIconOptions = [
+  IconOption(Icons.shield, Colors.blue),
+  IconOption(Icons.local_fire_department, Colors.red),
+  IconOption(Icons.bolt, Colors.orange),
+  IconOption(Icons.forest, Colors.green),
+  IconOption(Icons.auto_fix_high, Colors.purple),
+  IconOption(Icons.pets, Colors.brown),
+];
+
 class CharacterClass {
   final String name;
   final int level;
 
   const CharacterClass({required this.name, required this.level});
+
+
+  Map<String, dynamic> toJson() => {'name': name, 'level': level};
+
+  factory CharacterClass.fromJson(Map<String, dynamic> json) =>
+      CharacterClass(name: json['name'] ?? '', level: json['level'] ?? 1);
 }
 
-// Un oggetto O una passiva: nome + testo libero
 class CharacterEntry {
   String name;
   String description;
-  int quantity; // per le passive resta 1 e non lo mostriamo
+  int quantity;
 
   CharacterEntry({
     required this.name,
     this.description = '',
     this.quantity = 1,
   });
+
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'description': description,
+    'quantity': quantity,
+  };
+
+  factory CharacterEntry.fromJson(Map<String, dynamic> json) => CharacterEntry(
+    name: json['name'] ?? '',
+    description: json['description'] ?? '',
+    quantity: json['quantity'] ?? 1,
+  );
 }
 
-// Un incantesimo salvato: solo il minimo, il testo lo scarichi dopo
 class SpellRef {
   final String index; // es. "fireball" (serve per la fetch)
   final String name; // es. "Fireball"
@@ -31,10 +63,88 @@ class SpellRef {
     required this.name,
     required this.level,
   });
+  
+  Map<String, dynamic> toJson() => {
+    'index': index,
+    'name': name,
+    'level': level,
+  };
+
+  factory SpellRef.fromJson(Map<String, dynamic> json) => SpellRef(
+    index: json['index'] ?? '',
+    name: json['name'] ?? '',
+    level: json['level'] ?? 0,
+  );
 }
+// Un incantesimo salvato: solo il minimo, il testo lo scarichi dopo
 
 class CharacterSheet {
-  final Widget characterIcon;
+  int? id; // assegnato dal database (null finché non è salvato)
+  final int iconIndex;
+  Widget get characterIcon {
+    final i = iconIndex.clamp(0, characterIconOptions.length - 1);
+    final o = characterIconOptions[i];
+    return Icon(o.icon, color: o.color);
+  }
+
+  Map<String, dynamic> toJson() => {
+    'iconIndex': iconIndex,
+    'name': characterName,
+    'race': race,
+    'classes': classes.map((e) => e.toJson()).toList(),
+    'strength': strength,
+    'dexterity': dexterity,
+    'constitution': constitution,
+    'intelligence': intelligence,
+    'wisdom': wisdom,
+    'charisma': charisma,
+    'maxHp': maxHp,
+    'currentHp': currentHp,
+    'armorClass': armorClass,
+    'speed': speed,
+    'notes': notes,
+    'savingThrows': savingThrowProficiencies.toList(),
+    'skills': skillProficiencies.toList(),
+    'items': items.map((e) => e.toJson()).toList(),
+    'passives': passives.map((e) => e.toJson()).toList(),
+    'spells': spells.map((e) => e.toJson()).toList(),
+  };
+
+  factory CharacterSheet.fromJson(Map<String, dynamic> json, {int? id}) {
+    return CharacterSheet(
+      id: id,
+      iconIndex: json['iconIndex'] ?? 0,
+      characterName: json['name'] ?? '',
+      race: json['race'] ?? '',
+      classes: (json['classes'] as List? ?? [])
+          .map((e) => CharacterClass.fromJson(e))
+          .toList(),
+      strength: json['strength'] ?? 10,
+      dexterity: json['dexterity'] ?? 10,
+      constitution: json['constitution'] ?? 10,
+      intelligence: json['intelligence'] ?? 10,
+      wisdom: json['wisdom'] ?? 10,
+      charisma: json['charisma'] ?? 10,
+      maxHp: json['maxHp'] ?? 10,
+      currentHp: json['currentHp'],
+      armorClass: json['armorClass'] ?? 10,
+      speed: json['speed'] ?? 30,
+      notes: json['notes'] ?? '',
+      savingThrowProficiencies: Set<String>.from(
+        json['savingThrows'] ?? <String>[],
+      ),
+      skillProficiencies: Set<String>.from(json['skills'] ?? <String>[]),
+      items: (json['items'] as List? ?? [])
+          .map((e) => CharacterEntry.fromJson(e))
+          .toList(),
+      passives: (json['passives'] as List? ?? [])
+          .map((e) => CharacterEntry.fromJson(e))
+          .toList(),
+      spells: (json['spells'] as List? ?? [])
+          .map((e) => SpellRef.fromJson(e))
+          .toList(),
+    );
+  }
   final String characterName;
   final String race;
   List<CharacterClass> classes;
@@ -74,7 +184,8 @@ class CharacterSheet {
   final List<SpellRef> spells; //incantesimi conosciuti
 
   CharacterSheet({
-    required this.characterIcon,
+    required this.iconIndex,
+    this.id,
     required this.characterName,
     required this.race,
     required this.classes,
@@ -128,56 +239,4 @@ class CharacterSheet {
       classes.map((characterClass) => characterClass.name).join(', ');
 }
 
-final List<CharacterSheet> characters = [
-  CharacterSheet(
-    characterIcon: const Icon(Icons.shield, color: Colors.blue),
-    characterName: 'Arthas',
-    race: 'Umano',
-    classes: [CharacterClass(name: 'Paladino', level: 15)],
-    strength: 18,
-    dexterity: 10,
-    constitution: 16,
-    intelligence: 8,
-    wisdom: 12,
-    charisma: 16,
-    maxHp: 140,
-    armorClass: 20,
-    speed: 30,
-    notes: 'Il Barone ha un anello strano.',
-    savingThrowProficiencies: {'SAG', 'CAR'},
-    skillProficiencies: {'Atletica', 'Persuasione', 'Intimidire'},
-    items: [
-      CharacterEntry(name: 'Spada lunga +1', description: '1d8+1 taglienti'),
-      CharacterEntry(name: 'Pozione di cura', quantity: 3),
-    ],
-    passives: [
-      CharacterEntry(
-        name: 'Aura di protezione',
-        description: '+3 ai tiri salvezza degli alleati entro 3 m',
-      ),
-    ],
-    spells: [
-      const SpellRef(index: 'bless', name: 'Bless', level: 1),
-      const SpellRef(index: 'cure-wounds', name: 'Cure Wounds', level: 1),
-    ],
-  ),
-  CharacterSheet(
-    characterIcon: const Icon(Icons.bolt, color: Colors.orange),
-    characterName: 'Luna',
-    race: 'Elfo',
-    classes: [
-      CharacterClass(name: 'Ladro', level: 8),
-      CharacterClass(name: 'Ranger', level: 12),
-    ],
-    strength: 10,
-    dexterity: 9, // test: l'iniziativa deve mostrare -1
-    constitution: 12,
-    intelligence: 13,
-    wisdom: 14,
-    charisma: 10,
-    maxHp: 120,
-    currentHp: 80, // già ferita, per provare cura e danno
-    armorClass: 17,
-    skillProficiencies: {'Furtività', 'Percezione'},
-  ),
-];
+final List<CharacterSheet> characters = [];

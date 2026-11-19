@@ -1,3 +1,4 @@
+import 'package:thenetherscrolls/services/database_service.dart';
 import 'package:flutter/material.dart';
 import 'package:thenetherscrolls/data/character.dart';
 import 'package:thenetherscrolls/data/DnDData.dart';
@@ -79,14 +80,11 @@ class _AddnewCharacterState extends State<AddnewCharacter> {
     });
   }
 
-  void _save() {
-    // Se un campo non è valido, si ferma e mostra gli errori in rosso
+   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final option = _iconOptions[_iconIndex];
-
     final newCharacter = CharacterSheet(
-      characterIcon: Icon(option.icon, color: option.color),
+      iconIndex: _iconIndex,
       characterName: _nameCtrl.text.trim(),
       race: _raceCtrl.text.trim(),
       classes: [
@@ -101,13 +99,16 @@ class _AddnewCharacterState extends State<AddnewCharacter> {
       intelligence: _scores['INT']!,
       wisdom: _scores['SAG']!,
       charisma: _scores['CAR']!,
-      maxHp: int.parse(_hpCtrl.text), // currentHp parte uguale a maxHp
+      maxHp: int.parse(_hpCtrl.text),
       armorClass: int.parse(_acCtrl.text),
       speed: int.parse(_speedCtrl.text),
     );
 
-    characters.add(newCharacter); // la lista globale della Home
-    Navigator.pop(context); // torna indietro
+    await DatabaseService.insertCharacter(newCharacter); // salva su disco
+    characters.add(newCharacter); // aggiorna la lista in memoria
+
+    if (!mounted) return; // la pagina è ancora aperta?
+    Navigator.pop(context);
   }
 
   @override
