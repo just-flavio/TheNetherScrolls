@@ -1,25 +1,14 @@
-import 'package:thenetherscrolls/services/database_service.dart';
-import 'package:flutter/material.dart';
-import 'package:thenetherscrolls/data/character.dart';
-import 'package:thenetherscrolls/data/DnDData.dart';
-import 'package:thenetherscrolls/data/DnDMath.dart';
+// ===== IMPORT =====
+import 'package:thenetherscrolls/services/database_service.dart'; // salvataggio su disco
+import 'package:flutter/material.dart'; // widget base di Flutter
+import 'package:thenetherscrolls/data/character.dart'; // CharacterSheet, characters, characterIconOptions
+import 'package:thenetherscrolls/data/DnDData.dart'; // abilityNames (sigle e nomi)
+import 'package:thenetherscrolls/data/DnDMath.dart'; // modifier() e signed()
 
-// Un'icona possibile per il personaggio
-class _IconOption {
-  final IconData icon;
-  final Color color;
-  const _IconOption(this.icon, this.color);
-}
+// (Le icone ora stanno in character.dart come "characterIconOptions":
+//  qui non vanno più duplicate)
 
-const List<_IconOption> _iconOptions = [
-  _IconOption(Icons.shield, Colors.blue),
-  _IconOption(Icons.local_fire_department, Colors.red),
-  _IconOption(Icons.bolt, Colors.orange),
-  _IconOption(Icons.forest, Colors.green),
-  _IconOption(Icons.auto_fix_high, Colors.purple),
-  _IconOption(Icons.pets, Colors.brown),
-];
-
+// Pagina di creazione. StatefulWidget perché i valori cambiano mentre compili.
 class AddnewCharacter extends StatefulWidget {
   const AddnewCharacter({super.key});
 
@@ -28,9 +17,11 @@ class AddnewCharacter extends StatefulWidget {
 }
 
 class _AddnewCharacterState extends State<AddnewCharacter> {
+  // Chiave del Form: serve a lanciare la validazione (campi vuoti, numeri errati)
   final _formKey = GlobalKey<FormState>();
 
-  // Un controller per ogni campo di testo: serve a leggere cosa hai scritto
+  // Un controller per ogni campo di testo: serve a leggere cosa hai scritto.
+  // Il "text:" è il valore iniziale.
   final _nameCtrl = TextEditingController();
   final _raceCtrl = TextEditingController();
   final _classCtrl = TextEditingController();
@@ -40,15 +31,16 @@ class _AddnewCharacterState extends State<AddnewCharacter> {
   final _speedCtrl = TextEditingController(text: '30');
 
   // Le 6 caratteristiche, tutte a 10 all'inizio: {'FOR': 10, 'DES': 10, ...}
+  // "for (...) key: 10" costruisce la mappa partendo dalle sigle di abilityNames
   final Map<String, int> _scores = {
     for (final key in abilityNames.keys) key: 10,
   };
 
-  int _iconIndex = 0;
+  int _iconIndex = 0; // posizione dell'icona scelta in characterIconOptions
 
+  // dispose() parte quando la pagina si chiude: libera la memoria dei controller
   @override
   void dispose() {
-    // Libera la memoria dei controller quando la pagina si chiude
     _nameCtrl.dispose();
     _raceCtrl.dispose();
     _classCtrl.dispose();
@@ -59,38 +51,44 @@ class _AddnewCharacterState extends State<AddnewCharacter> {
     super.dispose();
   }
 
-  // Controlla che il testo sia un numero tra min e max
+  // Crea una funzione di controllo: il testo deve essere un numero tra min e max.
+  // Restituisce un messaggio di errore, oppure null se va bene.
   String? Function(String?) _intValidator(int min, int max) {
     return (value) {
-      final n = int.tryParse(value ?? '');
+      final n = int.tryParse(value ?? ''); // testo -> numero (null se non valido)
       if (n == null) return 'Numero?';
       if (n < min || n > max) return '$min-$max';
       return null; // null = va bene
     };
   }
 
+  // Controllo per i campi di testo obbligatori (nome, razza, classe)
   String? _requiredValidator(String? value) {
     if (value == null || value.trim().isEmpty) return 'Obbligatorio';
     return null;
   }
 
+  // Cambia una caratteristica di delta (+1 o -1), tra 1 e 30
   void _changeScore(String key, int delta) {
     setState(() {
       _scores[key] = (_scores[key]! + delta).clamp(1, 30);
     });
   }
 
-   Future<void> _save() async {
+  // Crea il personaggio e lo salva
+  Future<void> _save() async {
+    // validate() controlla tutti i campi: se uno è sbagliato mostra l'errore e ci fermiamo
     if (!_formKey.currentState!.validate()) return;
 
+    // Costruisco il personaggio con i valori letti dai campi
     final newCharacter = CharacterSheet(
       iconIndex: _iconIndex,
-      characterName: _nameCtrl.text.trim(),
+      characterName: _nameCtrl.text.trim(), // trim() toglie spazi ai bordi
       race: _raceCtrl.text.trim(),
       classes: [
         CharacterClass(
           name: _classCtrl.text.trim(),
-          level: int.parse(_levelCtrl.text),
+          level: int.parse(_levelCtrl.text), // sicuro: già validato
         ),
       ],
       strength: _scores['FOR']!,
@@ -99,27 +97,31 @@ class _AddnewCharacterState extends State<AddnewCharacter> {
       intelligence: _scores['INT']!,
       wisdom: _scores['SAG']!,
       charisma: _scores['CAR']!,
-      maxHp: int.parse(_hpCtrl.text),
+      maxHp: int.parse(_hpCtrl.text), // currentHp parte uguale a maxHp
       armorClass: int.parse(_acCtrl.text),
       speed: int.parse(_speedCtrl.text),
     );
 
-    await DatabaseService.insertCharacter(newCharacter); // salva su disco
-    characters.add(newCharacter); // aggiorna la lista in memoria
+    // await = aspetto che sia scritto su disco.
+    // Serve perché insertCharacter assegna l'id al personaggio.
+    await DatabaseService.insertCharacter(newCharacter);
+    characters.add(newCharacter); // aggiungo alla lista in memoria (usata dalla Home)
 
-    if (!mounted) return; // la pagina è ancora aperta?
-    Navigator.pop(context);
+    if (!mounted) return; // la pagina è ancora aperta? (obbligatorio dopo un await)
+    Navigator.pop(context); // torna alla Home
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Nuovo personaggio')),
+      // Form + validator = controllo dei campi in un punto solo
       body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // ===== BLOCCO 1: informazioni base =====
             _sectionTitle('Informazioni base'),
             TextFormField(
               controller: _nameCtrl,
@@ -127,7 +129,7 @@ class _AddnewCharacterState extends State<AddnewCharacter> {
                 labelText: 'Nome',
                 hintText: 'Es. Thorin',
               ),
-              textCapitalization: TextCapitalization.words,
+              textCapitalization: TextCapitalization.words, // maiuscola a ogni parola
               validator: _requiredValidator,
             ),
             TextFormField(
@@ -155,25 +157,30 @@ class _AddnewCharacterState extends State<AddnewCharacter> {
               validator: _intValidator(1, 20),
             ),
             const SizedBox(height: 16),
+
+            // ===== BLOCCO 2: scelta dell'icona =====
             const Text('Icona'),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               children: [
-                for (int i = 0; i < _iconOptions.length; i++)
+                // Un ChoiceChip per ogni icona disponibile
+                for (int i = 0; i < characterIconOptions.length; i++)
                   ChoiceChip(
                     label: Icon(
-                      _iconOptions[i].icon,
-                      color: _iconOptions[i].color,
+                      characterIconOptions[i].icon,
+                      color: characterIconOptions[i].color,
                     ),
-                    selected: _iconIndex == i,
+                    selected: _iconIndex == i, // evidenziata se è quella scelta
                     onSelected: (_) => setState(() => _iconIndex = i),
                   ),
               ],
             ),
             const SizedBox(height: 24),
 
+            // ===== BLOCCO 3: le 6 caratteristiche =====
             _sectionTitle('Caratteristiche'),
+            // "..." inserisce tutte le righe nella lista; una per sigla (FOR, DES...)
             ...abilityNames.keys.map(
               (key) => _AbilityStepper(
                 abbreviation: key,
@@ -185,6 +192,7 @@ class _AddnewCharacterState extends State<AddnewCharacter> {
             ),
             const SizedBox(height: 24),
 
+            // ===== BLOCCO 4: combattimento (PF, CA, velocità) =====
             _sectionTitle('Combattimento'),
             Row(
               children: [
@@ -218,6 +226,7 @@ class _AddnewCharacterState extends State<AddnewCharacter> {
             ),
             const SizedBox(height: 32),
 
+            // ===== PULSANTE FINALE =====
             FilledButton.icon(
               onPressed: _save,
               icon: const Icon(Icons.check),
@@ -230,6 +239,7 @@ class _AddnewCharacterState extends State<AddnewCharacter> {
     );
   }
 
+  // Titolo di sezione (es. "Caratteristiche"), riusato più volte
   Widget _sectionTitle(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -240,11 +250,11 @@ class _AddnewCharacterState extends State<AddnewCharacter> {
 
 // Riga caratteristica: FOR  Forza   [-]  16  (+3)  [+]
 class _AbilityStepper extends StatelessWidget {
-  final String abbreviation;
-  final String name;
-  final int score;
-  final VoidCallback onMinus;
-  final VoidCallback onPlus;
+  final String abbreviation; // sigla, es. "FOR"
+  final String name; // nome completo, es. "Forza"
+  final int score; // valore attuale
+  final VoidCallback onMinus; // cosa fare premendo "-"
+  final VoidCallback onPlus; // cosa fare premendo "+"
 
   const _AbilityStepper({
     required this.abbreviation,
@@ -258,6 +268,7 @@ class _AbilityStepper extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
+        // Sigla in grassetto, larghezza fissa per tenere le righe allineate
         SizedBox(
           width: 44,
           child: Text(
@@ -265,7 +276,7 @@ class _AbilityStepper extends StatelessWidget {
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
-        Expanded(child: Text(name)),
+        Expanded(child: Text(name)), // occupa lo spazio rimasto
         IconButton(
           icon: const Icon(Icons.remove_circle_outline),
           onPressed: onMinus,
@@ -282,6 +293,7 @@ class _AbilityStepper extends StatelessWidget {
           icon: const Icon(Icons.add_circle_outline),
           onPressed: onPlus,
         ),
+        // Modificatore col segno, es. "(+3)"
         SizedBox(
           width: 40,
           child: Text(

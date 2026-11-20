@@ -1,11 +1,19 @@
-import 'package:flutter/material.dart';
-import 'package:thenetherscrolls/data/character.dart';
-import 'package:thenetherscrolls/services/spell_api_service.dart';
+// ===== IMPORT =====
+import 'package:flutter/material.dart'; // widget base di Flutter
+import 'package:thenetherscrolls/data/character.dart'; // contiene SpellRef
+import 'package:thenetherscrolls/services/spell_api_service.dart'; // la fetch (internet)
 
+// Trasforma il livello in testo: 0 -> "Trucchetto", 3 -> "Livello 3"
 String levelLabel(int level) => level == 0 ? 'Trucchetto' : 'Livello $level';
+
+// Questo file contiene 3 schermate + 1 widget piccolo:
+//   1. SpellsTab          -> lista degli incantesimi del personaggio
+//   2. SpellSearchScreen  -> ricerca nella lista scaricata da internet
+//   3. SpellDetailScreen  -> dettaglio di un incantesimo (seconda fetch)
 
 // ============ 1. LISTA DEGLI INCANTESIMI DEL PERSONAGGIO ============
 class SpellsTab extends StatefulWidget {
+  // La lista del personaggio (la stessa di character.spells, non una copia)
   final List<SpellRef> spells;
 
   const SpellsTab({super.key, required this.spells});
@@ -15,38 +23,48 @@ class SpellsTab extends StatefulWidget {
 }
 
 class _SpellsTabState extends State<SpellsTab> {
+  // Apre la ricerca e aggiunge l'incantesimo scelto
   Future<void> _addSpell() async {
-    // Apre la ricerca e aspetta che tu ne scelga uno
+    // push<SpellRef> = apro la pagina e aspetto che restituisca un SpellRef.
+    // Il valore arriva quando la ricerca fa Navigator.pop(context, spell).
     final picked = await Navigator.push<SpellRef>(
       context,
       MaterialPageRoute(builder: (_) => const SpellSearchScreen()),
     );
-    if (picked == null) return;
+    if (picked == null) return; // sei tornato indietro senza scegliere
 
-    // Niente doppioni
-    final already = widget.spells.any((s) => s.index == picked.index);
-    if (already) return;
+    // Controllo doppioni: esiste già un incantesimo con lo stesso index?
+    final alreadyAdded = widget.spells.any(
+      (spell) => spell.index == picked.index,
+    );
+    if (alreadyAdded) return;
 
+    // Aggiungo alla lista e ridisegno
     setState(() => widget.spells.add(picked));
   }
 
   @override
   Widget build(BuildContext context) {
-    // Ordino per livello, poi per nome (copia: non tocco l'originale)
-    final sorted = [...widget.spells]..sort((a, b) {
-        final byLevel = a.level.compareTo(b.level);
+    // Ordino per livello, poi per nome.
+    // "[...lista]" crea una COPIA: ordino quella e lascio l'originale intatto.
+    final sorted = [...widget.spells]
+      ..sort((a, b) {
+        final byLevel = a.level.compareTo(b.level); // negativo, 0 o positivo
+        // se il livello è uguale (0), decide il nome in ordine alfabetico
         return byLevel != 0 ? byLevel : a.name.compareTo(b.name);
       });
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // Pulsante per aprire la ricerca
         OutlinedButton.icon(
           onPressed: _addSpell,
           icon: const Icon(Icons.search),
           label: const Text('Aggiungi incantesimo'),
         ),
         const SizedBox(height: 8),
+        // Messaggio mostrato solo se la lista è vuota
         if (sorted.isEmpty)
           const Padding(
             padding: EdgeInsets.all(24),
@@ -55,20 +73,23 @@ class _SpellsTabState extends State<SpellsTab> {
               textAlign: TextAlign.center,
             ),
           ),
+        // Una card per ogni incantesimo ("..." inserisce tutti gli elementi qui)
         ...sorted.map(
-          (s) => Card(
+          (spell) => Card(
             child: ListTile(
-              title: Text(s.name),
-              subtitle: Text(levelLabel(s.level)),
+              title: Text(spell.name),
+              subtitle: Text(levelLabel(spell.level)),
+              // Tocco sulla card: apre il dettaglio (fa la seconda fetch)
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => SpellDetailScreen(spell: s),
+                  builder: (_) => SpellDetailScreen(spell: spell),
                 ),
               ),
+              // Cestino a destra: toglie l'incantesimo dalla lista
               trailing: IconButton(
                 icon: const Icon(Icons.delete_outline),
-                onPressed: () => setState(() => widget.spells.remove(s)),
+                onPressed: () => setState(() => widget.spells.remove(spell)),
               ),
             ),
           ),
@@ -87,15 +108,19 @@ class SpellSearchScreen extends StatefulWidget {
 }
 
 class _SpellSearchScreenState extends State<SpellSearchScreen> {
+  // Future = "un risultato che arriverà": qui la lista scaricata da internet.
+  // "late" = lo assegno in initState, non subito.
   late Future<List<SpellRef>> _future;
-  String _query = '';
+  String _query = ''; // testo scritto nella barra di ricerca
 
+  // initState parte UNA volta, quando la pagina si apre: avvia il download
   @override
   void initState() {
     super.initState();
     _future = SpellApiService.fetchSpellList();
   }
 
+  // Riprova il download (pulsante mostrato in caso di errore)
   void _retry() {
     setState(() => _future = SpellApiService.fetchSpellList());
   }
@@ -104,15 +129,16 @@ class _SpellSearchScreenState extends State<SpellSearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Cerca incantesimo')),
+      // FutureBuilder ridisegna la pagina in base allo stato del download
       body: FutureBuilder<List<SpellRef>>(
         future: _future,
         builder: (context, snapshot) {
-          // STATO 1: sta caricando
+          // STATO 1: sta ancora scaricando -> spinner
           if (snapshot.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          // STATO 2: errore
+          // STATO 2: errore (niente internet, server giù...) -> messaggio + Riprova
           if (snapshot.hasError) {
             return Center(
               child: Column(
@@ -129,13 +155,15 @@ class _SpellSearchScreenState extends State<SpellSearchScreen> {
             );
           }
 
-          // STATO 3: dati pronti, filtro in locale
+          // STATO 3: dati pronti. Filtro in locale (nessuna chiamata a ogni lettera).
+          // snapshot.data! = la lista scaricata ("!" = so che non è null)
           final filtered = snapshot.data!
-              .where((s) => s.name.toLowerCase().contains(_query))
+              .where((spell) => spell.name.toLowerCase().contains(_query))
               .toList();
 
           return Column(
             children: [
+              // Barra di ricerca
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: TextField(
@@ -144,20 +172,24 @@ class _SpellSearchScreenState extends State<SpellSearchScreen> {
                     hintText: 'Es. fireball',
                     border: OutlineInputBorder(),
                   ),
-                  onChanged: (v) =>
-                      setState(() => _query = v.trim().toLowerCase()),
+                  // A ogni lettera salvo il testo (minuscolo, senza spazi ai lati)
+                  // e ridisegno: la lista si restringe subito
+                  onChanged: (text) =>
+                      setState(() => _query = text.trim().toLowerCase()),
                 ),
               ),
+              // Expanded = la lista occupa tutto lo spazio rimasto
               Expanded(
                 child: ListView.builder(
                   itemCount: filtered.length,
-                  itemBuilder: (context, i) {
-                    final s = filtered[i];
+                  itemBuilder: (context, index) {
+                    final spell = filtered[index];
                     return ListTile(
-                      title: Text(s.name),
-                      subtitle: Text(levelLabel(s.level)),
-                      // Tocca = scegli e torna indietro
-                      onTap: () => Navigator.pop(context, s),
+                      title: Text(spell.name),
+                      subtitle: Text(levelLabel(spell.level)),
+                      // Tocco = scelgo e torno indietro, restituendo l'incantesimo
+                      // (arriva a "picked" dentro _addSpell)
+                      onTap: () => Navigator.pop(context, spell),
                     );
                   },
                 ),
@@ -171,8 +203,9 @@ class _SpellSearchScreenState extends State<SpellSearchScreen> {
 }
 
 // ============ 3. DETTAGLIO (seconda fetch) ============
+// StatelessWidget: non ha dati che cambiano da soli, il FutureBuilder gestisce il resto
 class SpellDetailScreen extends StatelessWidget {
-  final SpellRef spell;
+  final SpellRef spell; // l'incantesimo da mostrare (solo nome, livello e index)
 
   const SpellDetailScreen({super.key, required this.spell});
 
@@ -180,46 +213,54 @@ class SpellDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(spell.name)),
+      // Scarica il testo completo usando l'index (es. "fireball")
       body: FutureBuilder<SpellDetail>(
         future: SpellApiService.fetchSpell(spell.index),
         builder: (context, snapshot) {
+          // Sta scaricando -> spinner
           if (snapshot.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
+          // Errore -> messaggio
           if (snapshot.hasError) {
             return const Center(
               child: Text('Impossibile caricare. Controlla la connessione.'),
             );
           }
 
-          final d = snapshot.data!;
+          // Dati pronti
+          final detail = snapshot.data!;
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              // Es. "Livello 3 • Evocation"
               Text(
-                '${levelLabel(d.level)} • ${d.school}',
+                '${levelLabel(detail.level)} • ${detail.school}',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 12),
-              _Line(label: 'Tempo di lancio', value: d.castingTime),
-              _Line(label: 'Gittata', value: d.range),
-              _Line(label: 'Componenti', value: d.components),
-              _Line(label: 'Durata', value: d.duration),
-              const Divider(height: 24),
-              // desc è una lista di paragrafi
-              ...d.description.map(
-                (p) => Padding(
+              // Le righe con le informazioni principali
+              _InfoLine(label: 'Tempo di lancio', value: detail.castingTime),
+              _InfoLine(label: 'Gittata', value: detail.range),
+              _InfoLine(label: 'Componenti', value: detail.components),
+              _InfoLine(label: 'Durata', value: detail.duration),
+              const Divider(height: 24), // linea di separazione
+              // La descrizione arriva come lista di paragrafi: uno Text ciascuno
+              ...detail.description.map(
+                (paragraph) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(p),
+                  child: Text(paragraph),
                 ),
               ),
-              if (d.higherLevel.isNotEmpty) ...[
+              // "A livelli superiori": solo se l'incantesimo lo prevede
+              if (detail.higherLevel.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(
                   'A livelli superiori',
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
-                ...d.higherLevel.map(Text.new),
+                // Text.new = scorciatoia per (testo) => Text(testo)
+                ...detail.higherLevel.map(Text.new),
               ],
             ],
           );
@@ -229,16 +270,18 @@ class SpellDetailScreen extends StatelessWidget {
   }
 }
 
-class _Line extends StatelessWidget {
-  final String label;
-  final String value;
+// Riga "Etichetta: valore", con l'etichetta in grassetto
+class _InfoLine extends StatelessWidget {
+  final String label; // es. "Gittata"
+  final String value; // es. "150 feet"
 
-  const _Line({required this.label, required this.value});
+  const _InfoLine({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
+      // Text.rich permette di mescolare stili diversi nella stessa riga
       child: Text.rich(
         TextSpan(
           children: [
