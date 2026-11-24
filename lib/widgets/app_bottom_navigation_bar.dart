@@ -23,10 +23,6 @@ class AppBottomNavigationBar extends StatelessWidget {
           label: 'Schede',
         ),
         NavigationDestination(
-          icon: AppIcon(AppIcons.campagne),
-          label: 'Campagne',
-        ),
-        NavigationDestination(
           icon: AppIcon(AppIcons.dadi),
           label: 'Dadi',
         ),

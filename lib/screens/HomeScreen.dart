@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:thenetherscrolls/screens/CharacterDetailsView.dart';
 import 'package:thenetherscrolls/screens/AddNewCharacterView.dart';
 import 'package:thenetherscrolls/screens/DiceScreen.dart';
-import 'package:thenetherscrolls/widgets/AppBottomNavBar.dart';
+import 'package:thenetherscrolls/widgets/app_bottom_navigation_bar.dart';
 import 'package:thenetherscrolls/widgets/character_tile.dart';
 import 'package:thenetherscrolls/data/character.dart';
 import 'package:thenetherscrolls/data/themeController.dart';
