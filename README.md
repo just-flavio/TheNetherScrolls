@@ -22,3 +22,5 @@ Gestiti: caricamento (spinner), errore con pulsante "Riprova", timeout di 10 sec
 ## Note
 - Il database sqflite non funziona su web: su Chrome i dati restano in memoria.
 - Possibili miglioramenti: cache degli incantesimi su disco, slot incantesimo, multiclasse completo.
+
+- Questo è un progetto scolastico Basico per l'apprendimento di flutter
